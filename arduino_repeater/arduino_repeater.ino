@@ -18,7 +18,7 @@ Based on UKHASnet rf69_repeater by James Coxon M6JCX
  float battV=0.0;
 #endif
 uint8_t n, i, j, k, packet_len;
-uint32_t count = 1, data_interval = 2; // Initially send a couple of beacons in quick succession
+uint32_t timer;
 uint8_t zombie_mode; // Stores current status: 0 - Full Repeating, 1 - Low Power shutdown, (beacon only)
 uint8_t data_count = 97; // 'a'
 char data[64], string_end[] = "]";
@@ -128,17 +128,23 @@ void setup()
      Serial.print(data[j]);
    }
   #endif
+  
+  timer = millis();
+}
+
+void wakeUp()
+{
+    // Just a handler for the pin interrupt.
 }
 
 void loop()
 {
-  count++;
-  
   if(zombie_mode==0) {
     rf69.setMode(RFM69_MODE_RX);
     
-    for(i=0; i<255; i++) {
-      LowPower.idle(SLEEP_30MS, ADC_OFF, TIMER2_OFF, TIMER1_OFF, TIMER0_OFF, SPI_OFF, USART0_ON, TWI_OFF);
+    attachInterrupt(0, wakeUp, HIGH);
+    LowPower.idle(SLEEP_8S, ADC_OFF, TIMER2_OFF, TIMER1_OFF, TIMER0_ON, SPI_OFF, USART0_ON, TWI_OFF);
+    detachInterrupt(0); 
       
       if (rf69.checkRx()) {
         rf69.recv(buf, &len);
@@ -189,7 +195,6 @@ void loop()
             #endif
         }
       }
-    }
   } else {
     // Battery Voltage Low - Zombie Mode
     
@@ -198,7 +203,8 @@ void loop()
     LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
   }
   
-  if (count >= data_interval){
+  if (millis() - timer > BEACON_INTERVAL*1000){
+    timer = millis();
     data_count++;
 
     if(data_count > 122){
@@ -220,7 +226,6 @@ void loop()
      }
     #endif
     
-    data_interval = random((BEACON_INTERVAL/8), (BEACON_INTERVAL/8)+2) + count;
     #ifdef ENABLE_ZOMBIE_MODE
      if(battV > ZOMBIE_THRESHOLD && zombie_mode==1) {
          rf69.setMode(RFM69_MODE_RX);
