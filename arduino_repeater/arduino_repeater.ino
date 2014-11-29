@@ -175,7 +175,10 @@ void loop()
           packet_len = end_bracket + sprintf((char *)&buf[end_bracket], ",%s]", id);
 
           //random delay to try and avoid packet collision
-          delay(random(50, 800));
+          // originally between 50 and 800 ms
+          for (j = 0; j < random(1, 13); j++) {
+            LowPower.powerDown(SLEEP_60MS, ADC_OFF, BOD_OFF);
+          }
           
           rf69.send((uint8_t*)buf, packet_len, rfm_power);
           #ifdef ENABLE_UART_OUTPUT
