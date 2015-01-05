@@ -18,6 +18,11 @@ Universal code for different node types:
 #include <LowPower.h>
 #include "NodeConfig.h"
 
+// Anarduino Flash memory
+#ifdef ANARDUINO 
+#include <SPIFlash.h>
+#endif
+
 //************* Misc Setup ****************/
 #ifdef ENABLE_BATTV_SENSOR
  float battV=0.0;
@@ -575,8 +580,10 @@ uint8_t gen_Data() {
     }
   #endif
   
-  #ifdef ENABLE_RFM_TEMPERATURE
-   sprintf(data,"%sT%d",data,sampleRfmTemp());
+  #ifdef ENABLE_RFM_TEMPERATURE 
+    #ifndef ENABLE_DS18B20
+      sprintf(data,"%sT%d",data,sampleRfmTemp());
+    #endif
   #endif
   
   
@@ -631,7 +638,7 @@ uint8_t gen_Data() {
      char tempbuf4[6];
      dtostrf(temp_2, 3, 1, tempbuf4);
      sprintf(data, "%s,%s", data, tempbuf4);
-   #endif   
+   #endif
    digitalWrite(DS18B20_PWR, LOW);
   #endif
 
@@ -680,6 +687,22 @@ void setup() {
 
   #ifdef ENABLE_UART_OUTPUT
    Serial.begin(9600);
+   //Serial.println("go");
+  #endif
+  
+  // disable Anarduino Flash memory to save power
+  // http://forum.anarduino.com/posts/list/39.page#198
+  #ifdef ANARDUINO
+    // put flash memory to sleep  
+    // Anarduino: Flash SPI_CS = 5, ID = 0xEF30 (Winbond 4Mbit flash)
+    SPIFlash flash(5, 0); // flash(SPI_CS, MANUFACTURER_ID)
+    if (flash.initialize()) {
+      //Serial.println("Flash Init OK!");
+      flash.sleep();   // put flash (if it exists) into low power mode
+      //Serial.println("Flash sleep");
+    } else {
+      //Serial.println("Flash Init FAIL!");
+    }
   #endif
   
   #ifdef ENABLE_ETHERNET
@@ -739,9 +762,12 @@ void setup() {
     digitalWrite(BATTV_PIN, LOW);
   #endif
   
+  //Serial.println("init..");
   while (!rf69.init()){
     LowPower.powerDown(SLEEP_120MS, ADC_OFF, BOD_OFF);
+    //Serial.print(".");
   }
+  //Serial.println("\ninit done");
   
   packet_len = gen_Data();
   rf69.send((uint8_t*)data, packet_len, rfm_power);
