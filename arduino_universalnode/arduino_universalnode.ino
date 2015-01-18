@@ -67,12 +67,12 @@ int8_t sampleRfmTemp() {
   //analogRead(BATTV_PIN);
   //delay(10);
   float value = 0;
-  for (byte b = 0; b < 3; b++) {
-    value += analogRead(BATTV_PIN);
-    delay(5);
-  }
+  //for (byte b = 0; b < 3; b++) {
+  //  value += analogRead(BATTV_PIN);
+  //  delay(5);
+  //}
   value += analogRead(BATTV_PIN);
-  value /= 4; 
+  //value /= 4; 
   float vout = (value * BATTV_AREF) / 1024.0;
   // Serial.print("val="); Serial.println(value);
   // Serial.print("V="); Serial.println(vout);
@@ -601,7 +601,9 @@ uint8_t gen_Data() {
     dtostrf(ftemp, 3, 1, tempbuf);
 
     #ifdef ENABLE_BMP085_TEMP
-      sprintf(data, "%sT%s", data, tempbuf);
+      #ifndef ENABLE_DS18B20
+        sprintf(data, "%sT%s", data, tempbuf);
+      #endif
     #endif
     #ifdef ENABLE_BMP085_PRESSURE
       sprintf(data, "%sP%ld", data, pressure);
@@ -634,15 +636,37 @@ uint8_t gen_Data() {
    dtostrf(temp, 3, 1, tempbuf3);
    sprintf(data, "%sT%s", data, tempbuf3);
    #ifdef ENABLE_DS18B20_2
+     // append second DS18B20 temperature
      float temp_2 = sensors.getTempC(ds_addr_2);
      char tempbuf4[6];
      dtostrf(temp_2, 3, 1, tempbuf4);
      sprintf(data, "%s,%s", data, tempbuf4);
    #endif
+   #ifdef ENABLE_BMP085_TEMP
+     // append BMP085 temperature
+     sprintf(data, "%s,%s", data, tempbuf);
+   #endif
    digitalWrite(DS18B20_PWR, LOW);
   #endif
 
+  #ifdef ENABLE_LDR
+    //byte LDR_Pin = A0;
+    digitalWrite(LDR_PWR, HIGH);
+    int LDRReading = analogRead(LDR_PIN);
+    digitalWrite(LDR_PWR, LOW);
+    if (!isnan(LDRReading)) {
+      char tmpbuf1[6];
+      dtostrf(LDRReading, 1, 0, tmpbuf1);
+      sprintf(data, "%sS%s", data, tmpbuf1);
+    }
+  #endif
+
   #ifdef ENABLE_BATTV_SENSOR
+   analogRead(A1);
+   LowPower.powerDown(SLEEP_30MS, ADC_OFF, BOD_OFF);
+   analogRead(BATTV_PIN);
+   LowPower.powerDown(SLEEP_30MS, ADC_OFF, BOD_OFF);
+  
    battV = sampleBattv();
    //char* battStr;
    //char tempStrB[14]; //make buffer large enough for 7 digits
@@ -747,6 +771,11 @@ void setup() {
    #endif
    digitalWrite(DS18B20_PWR, LOW);
   #endif
+
+  #ifdef ENABLE_LDR
+    pinMode(LDR_PWR, OUTPUT);
+  #endif
+
 
   #ifdef ENABLE_GPS
     Serial.begin(9600);
@@ -957,7 +986,7 @@ void loop()
     
     data_interval = random((BEACON_INTERVAL/8), (BEACON_INTERVAL/8)+2) + count;
     #ifdef ENABLE_ZOMBIE_MODE
-     if(battV > ZOMBIE_THRESHOLD && zombie_mode==1) {
+     if(battV > ZOMBIE_THRESHOLD+0.05 && zombie_mode==1) {
          rf69.setMode(RFM69_MODE_RX);
          zombie_mode=0;
          #ifdef SENSITIVE_RX
@@ -970,9 +999,6 @@ void loop()
     #endif
   }
 }
-
-
-
 
 
 
